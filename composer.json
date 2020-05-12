@@ -15,6 +15,7 @@
     ],
     "minimum-stability": "dev",
     "prefer-stable": true,
+    "version": "0.0.1",
     "autoload": {
         "psr-4": {
             "Bolt\\Extension\\GTaRR\\PdfRenderer\\": "src"
