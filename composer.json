@@ -1,6 +1,6 @@
 {
     "name": "gtarr/pdfrenderer",
-    "description": "Render PDF to JPG images on server.",
+    "description": "Bolt extension for render PDF to JPG images on server.",
     "type": "bolt-extension",
     "keywords": ["pdf"],
     "require": {
