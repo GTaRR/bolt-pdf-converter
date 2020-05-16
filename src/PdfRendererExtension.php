@@ -43,7 +43,7 @@ class PdfRendererExtension extends SimpleExtension
     public function myTwigFunction()
     {
         $context = [
-            'something' => mt_rand(),
+            'something' => mt_rand().'test',
         ];
 
         return $this->renderTemplate('extension.twig', $context);
