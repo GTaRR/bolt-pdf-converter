@@ -5,6 +5,7 @@ namespace Bolt\Extension\GTaRR\PdfRenderer;
 use Bolt\Asset\File\JavaScript;
 use Bolt\Asset\File\Stylesheet;
 use Bolt\Extension\SimpleExtension;
+use Bolt\Filesystem\FilesystemInterface;
 
 /**
  * ExtensionName extension class.
@@ -31,8 +32,26 @@ class PdfRendererExtension extends SimpleExtension
     protected function registerTwigFunctions()
     {
         return [
-            'my_twig_function' => 'myTwigFunction',
+            'fromPDFImages' => 'fromPDFImages',
         ];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function registerTwigPaths()
+    {
+        return [
+            'templates' => ['position' => 'prepend', 'namespace' => 'bolt'],
+        ];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function registerFrontendRoutes(ControllerCollection $collection)
+    {
+        $collection->match('/pdf-convert', [$this, 'callbackPdfConvert']);
     }
 
     /**
@@ -40,12 +59,42 @@ class PdfRendererExtension extends SimpleExtension
      *
      * @return string
      */
-    public function myTwigFunction()
+    public function fromPDFImages()
     {
         $context = [
-            'something' => mt_rand().'test',
+            'pdf_images' => mt_rand() . 'test',
         ];
 
-        return $this->renderTemplate('extension.twig', $context);
+        return $this->renderTemplate('pdf_images.twig', $context);
+    }
+
+    /**
+     * @param Application $app
+     * @param Request     $request
+     *
+     * @return Response
+     */
+    public function callbackPdfConvert(Application $app, Request $request)
+    {
+        return new Response('Drop bear sighted!', Response::HTTP_OK);
+    }
+
+    public function renderImages($pdfFile)
+    {
+        $mountPointName = 'files';
+
+        /** @var \Bolt\Filesystem\Manager $manager */
+        $manager = $app['filesystem'];
+
+        $im = new imagick();
+        $im->readImage('file.pdf');
+
+        $i = 0;
+        while($im->hasNextImage())
+        {
+            $im->writeImage(++$i.'-converted.jpg');
+            $im->nextImage();
+        }
+        $im->setImageFormat('jpg');
     }
 }
