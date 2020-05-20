@@ -1,3 +1,20 @@
-<div>
-    <p>Your parameter is: {{ pdf_images }}</p>
+<div class="b-pdf-carousel load">
+    <div class="b-pdf-carousel-main">
+        <button class="b-pdf-carousel-prev"></button>
+        <div class="b-pdf-carousel-viewport">
+            {% for image in images %}
+            <div class="b-pdf-carousel-slide">
+                <img src="{{ image }}" alt="" />
+            </div>
+            {% endfor %}
+        </div>
+        <button class="b-pdf-carousel-next"></button>
+    </div>
+    <div class="b-pdf-carousel-footer">
+        <div class="b-pdf-carousel-scale-track"></div>
+        <div class="b-pdf-carousel-pagenums">
+            Страница:
+            <span id="page_num">1</span> / <span id="page_count">{{ pdf_images_count }}</span>
+        </div>
+    </div>
 </div>

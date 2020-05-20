@@ -1,1 +1,132 @@
-/*** Put your css styles here ****/
+.b-pdf-carousel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+.b-pdf-carousel-main {
+    display: flex;
+    max-width: 100%;
+    position: relative;
+}
+
+/* prev/next */
+.b-pdf-carousel-prev,
+.b-pdf-carousel-next {
+    display: none;
+    appearance: none;
+    border: none;
+    flex: 1 1 auto;
+    cursor: pointer;
+    /*background-color: rgba(0,0,0,.05);*/
+    background-color: #f9f9f988;
+    outline: none;
+    transition: background-color .3s;
+    position: absolute;
+    top: 0;
+    z-index: 1;
+    height: 100%;
+}
+.b-pdf-carousel-prev:hover,
+.b-pdf-carousel-next:hover {
+    background-color: #f9f9f9aa;
+}
+.b-pdf-carousel.load .b-pdf-carousel-prev,
+.b-pdf-carousel.load .b-pdf-carousel-next {
+    display: block;
+    transition: all 0.3s ease;
+    flex: 0 0 auto;
+    width: 100px;
+}
+.b-pdf-carousel.load .b-pdf-carousel-next {
+    background-image: url(right-arrows.svg);
+    background-position: center;
+    background-size: 27px;
+    background-repeat: no-repeat;
+    /*background-color: transparent;*/
+    right: 0;
+}
+.b-pdf-carousel.load .b-pdf-carousel-prev {
+    background-image: url(left-arrows.svg);
+    background-position: center;
+    background-size: 27px;
+    background-repeat: no-repeat;
+    /*background-color: transparent;*/
+    left: 0;
+}
+.b-pdf-carousel.load .b-pdf-carousel-prev:hover,
+.b-pdf-carousel.load .b-pdf-carousel-next:hover {
+    /*transform: scale(1.2);*/
+    background-size: 32px;
+}
+.b-pdf-carousel .b-pdf-carousel-prev:disabled,
+.b-pdf-carousel .b-pdf-carousel-next:disabled{
+    opacity: 0;
+    pointer-events: none;
+}
+.b-pdf-carousel.load .b-pdf-carousel-prev:focus,
+.b-pdf-carousel.load .b-pdf-carousel-next:focus {
+    background-color: #f9f9f988;
+}
+
+/* footer */
+.b-pdf-carousel.load .b-pdf-carousel-footer {
+    display: flex;
+}
+.b-pdf-carousel-footer {
+    display: none;
+    justify-content: space-between;
+    padding: 16px 64px 48px;
+    width: 100%;
+    background-color: transparent;
+}
+.b-pdf-carousel-footer .b-pdf-carousel-pagenums {
+
+}
+
+/* viewport */
+.b-pdf-carousel-viewport {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: calc(100vh - 61px);
+    display: flex;
+    flex: 1 0 auto;
+    width: 100%;
+    overflow: hidden;
+}
+
+/* slide */
+.b-pdf-carousel-slide {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: calc(100vh - 61px);
+    width: 100%;
+}
+.b-pdf-carousel-slide:not(.active) {
+    display: none;
+}
+.b-pdf-carousel-slide img {
+    cursor: grab;
+    max-width: none;
+}
+.grab .b-pdf-carousel-slide img {
+    cursor: grabbing;
+}
+
+/* slider zoom */
+.b-pdf-carousel-scale-track {
+    min-width: 200px;
+    width: calc(100% - 200px);
+    margin-top: 6px;
+}
+/*.b-pdf-carousel-scale-track.noUi-horizontal {*/
+/*    height: 6px;*/
+/*}*/
+/*.b-pdf-carousel-scale-track.noUi-horizontal .noUi-handle {*/
+/*    height: 20px;*/
+/*}*/
+/*.b-pdf-carousel-scale-track .noUi-handle:after,*/
+/*.b-pdf-carousel-scale-track .noUi-handle:before {*/
+/*    height: 8px;*/
+/*}*/

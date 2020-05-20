@@ -6,6 +6,12 @@ use Bolt\Asset\File\JavaScript;
 use Bolt\Asset\File\Stylesheet;
 use Bolt\Extension\SimpleExtension;
 use Bolt\Filesystem\FilesystemInterface;
+use Silex\Application;
+use Silex\ControllerCollection;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\VarDumper\VarDumper;
+use Twig\Error\Error;
 
 /**
  * ExtensionName extension class.
@@ -21,7 +27,9 @@ class PdfRendererExtension extends SimpleExtension
     {
         // Add some web assets from the web/ directory
         return [
+            new Stylesheet('nouislider.min.css'),
             new Stylesheet('extension.css'),
+            new JavaScript('nouislider.min.js'),
             new JavaScript('extension.js'),
         ];
     }
@@ -32,7 +40,7 @@ class PdfRendererExtension extends SimpleExtension
     protected function registerTwigFunctions()
     {
         return [
-            'fromPDFImages' => 'fromPDFImages',
+            'imagesFromPDF' => 'imagesFromPDF',
         ];
     }
 
@@ -47,54 +55,117 @@ class PdfRendererExtension extends SimpleExtension
     }
 
     /**
-     * {@inheritdoc}
-     */
-    protected function registerFrontendRoutes(ControllerCollection $collection)
-    {
-        $collection->match('/pdf-convert', [$this, 'callbackPdfConvert']);
-    }
-
-    /**
-     * The callback function when {{ my_twig_function() }} is used in a template.
+     * The callback function when {{ imagesFromPDF() }} is used in a template.
      *
      * @return string
      */
-    public function fromPDFImages()
+    public function imagesFromPDF($record = null)
     {
+        $app = $this->getContainer();
+
+        if (empty($record)) {
+            $vars = $app['twig']->getGlobals();
+            if (isset($vars['record'])) {
+                $record = $vars['record'];
+            }
+        }
+
+        if (!$record) return;
+
+        $content = $record->values['body'];
+        preg_match("#.*?<a.*\/files\/([^\"]*\.pdf)[-\"\\' =:;,><«»() . +?–— & ’ % \/А - Яа - я\w\d\t\s]*#", $content, $matches);
+
+        $firstPdfPath = $matches[1];
+
+        if (!$firstPdfPath) return;
+
+        /** @var \Bolt\Filesystem\Manager $manager */
+        $manager = $app['filesystem'];
+
+        /** @var \Bolt\Filesystem\FilesystemInterface $filesystem */
+        $filesystem = $manager->getFilesystem('files');
+
+        /** @var \Bolt\Filesystem\Handler\FileInterface $file */
+        $file = $filesystem->getFile($firstPdfPath);
+
+        if (!$file->exists()) return;
+
+        $images = $this->convertImages($firstPdfPath);
+
         $context = [
-            'pdf_images' => mt_rand() . 'test',
+            'pdf_images_count' => count($images),
+            'images' => $images
         ];
 
         return $this->renderTemplate('pdf_images.twig', $context);
     }
 
-    /**
-     * @param Application $app
-     * @param Request     $request
-     *
-     * @return Response
-     */
-    public function callbackPdfConvert(Application $app, Request $request)
+    public function convertImages($file)
     {
-        return new Response('Drop bear sighted!', Response::HTTP_OK);
-    }
+        $convertedDir = '/files/converted-pdf/';
 
-    public function renderImages($pdfFile)
-    {
-        $mountPointName = 'files';
+        if (!is_dir($_SERVER['DOCUMENT_ROOT'] . $convertedDir)) {
+            mkdir($_SERVER['DOCUMENT_ROOT'] . $convertedDir, 0755);
+        }
 
-        /** @var \Bolt\Filesystem\Manager $manager */
-        $manager = $app['filesystem'];
+        $filePath = $_SERVER['DOCUMENT_ROOT'] . '/files/' . $file;
+        $name = explode('.', $file)[0];
+        $convertedImages = [];
 
-        $im = new imagick();
-        $im->readImage('file.pdf');
+        // if images already converted return them
+        $jsonImages = null;
+        if (file_exists($_SERVER['DOCUMENT_ROOT'].$convertedDir.$name.'_manifest.json'))
+            $jsonImages = file_get_contents($_SERVER['DOCUMENT_ROOT'].$convertedDir.$name.'_manifest.json');
+        if ($jsonImages) {
+            $images = json_decode($jsonImages);
+
+            if (count($images) > 0) {
+                $isNotFound = false;
+
+                foreach ($images as $image) {
+                    if (!file_exists($_SERVER['DOCUMENT_ROOT'] . $image)) {
+                        $isNotFound = true;
+                    }
+                }
+
+                if (!$isNotFound) {
+                    return $images;
+                }
+            }
+        }
+
+        if (!extension_loaded('imagick'))
+            throw new Error('imagick is not installed');
+
+        $im = new \Imagick();
+        $im->readImage($filePath);
+        $im->setFirstIterator();
+
+        $numPages = $im->getNumberImages();
 
         $i = 0;
-        while($im->hasNextImage())
+        while($i < $numPages)
         {
-            $im->writeImage(++$i.'-converted.jpg');
-            $im->nextImage();
+            $path = $convertedDir.$name.'_'.$i.'_converted.jpg';
+            $absolutePath = $_SERVER['DOCUMENT_ROOT'] . $path;
+
+            if (file_exists($absolutePath)) {
+                $convertedImages[] = $path;
+            } else {
+                $im = new \Imagick();
+                $im->setResolution(144, 144);
+                $im->readImage($filePath.'['.$i.']');
+                $im = $im->flattenImages();
+//                $im->writeImage($absolutePath);
+                $im->setImageFormat('jpg');
+                file_put_contents($absolutePath, $im);
+                $convertedImages[] = $path;
+            }
+            $i++;
         }
-        $im->setImageFormat('jpg');
+
+        file_put_contents($_SERVER['DOCUMENT_ROOT'].$convertedDir.$name.'_manifest.json', json_encode($convertedImages));
+
+        return $convertedImages;
     }
 }
