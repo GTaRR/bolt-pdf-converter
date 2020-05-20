@@ -1,4 +1,4 @@
-PDF Renderer
+PDF Converter
 ======================
 
-Bolt extension for render PDF to JPG images on server.
+Bolt extension for convert PDF to JPG images on server.
