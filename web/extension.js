@@ -1,6 +1,15 @@
 (function () {
     document.addEventListener('DOMContentLoaded', function () {
 
+        // Polyfill for ie11
+        Math.sign = Math.sign || function(x) {
+            x = +x; // преобразуем в число
+            if (x === 0 || isNaN(x)) {
+                return x;
+            }
+            return x > 0 ? 1 : -1;
+        }
+
         class zoomReader {
             constructor(options) {
                 this.container = document.querySelector(options.container);
@@ -10,6 +19,8 @@
                 this.nextBtn = document.querySelector(options.next);
                 this.numPage = document.querySelector(options.numPage);
                 this.pageCount = document.querySelector(options.pageCount);
+                this.plus = document.querySelector(options.plus);
+                this.minus = document.querySelector(options.minus);
                 this.renderer = options.renderer;
                 this.scaleSlider = null;
 
@@ -33,6 +44,25 @@
                 this.prevBtn.addEventListener('click', () => { this.prevPage(); });
                 this.nextBtn.addEventListener('click', () => { this.nextPage(); });
 
+                this.plus.addEventListener('click', () => {
+                    if (this.scale + .2 <= this.renderer.maxScale) {
+                        this.scale += .2;
+                    } else {
+                        this.scale = this.renderer.maxScale;
+                    }
+                    this.renderer.scale(this.scale);
+                    this.scaleSlider.set(this.scale * this.percentContain);
+                });
+                this.minus.addEventListener('click', () => {
+                    if (this.scale - .2 >= 1) {
+                        this.scale -= .2;
+                    } else {
+                        this.scale = 1;
+                    }
+                    this.renderer.scale(this.scale);
+                    this.scaleSlider.set(this.scale * this.percentContain);
+                });
+
                 setTimeout(() => {
                     this.setImagesSize();
                 }, 0);
@@ -55,35 +85,36 @@
                     start: '0',
                     range: {
                         'min': [this.percentContain],
-                        '30%': [50],
-                        '70%': [100],
+                        // '30%': [50],
+                        // '70%': [100],
                         'max': [this.percentContain * 5]
                     },
-                    pips: {
-                        mode: 'range',
-                        density: 4
-                    }
+                    // pips: {
+                    //     mode: 'range',
+                    //     density: 4
+                    // }
                 });
 
                 this.scaleSlider = scaleSlider.noUiSlider;
             }
 
-            setScale(state) {
-                let scale = state.transformation.scale;
+            setScale(scale) {
                 this.scale = scale;
                 this.scaleSlider.set(scale * this.percentContain);
             }
 
             updateSlider() {
-                const scale = this.scaleSlider.get() / this.percentContain;
-                this.renderer.scale(scale);
+                this.scale = this.scaleSlider.get() / this.percentContain;
+                this.renderer.scale(this.scale);
             }
 
             setImagesSize() {
                 let height = this.viewport.clientHeight;
-                this.slides.forEach((slide)=>{
-                    slide.querySelector('img').style.height = height+'px';
-                });
+
+                for (let i = 0; i < this.slides.length; i++) {
+                    let slide = this.slides[i];
+                    slide.getElementsByTagName('img')[0].style.height = height+'px';
+                }
 
                 let originalImage = new Image();
                 originalImage.onload = () => {
@@ -114,9 +145,10 @@
                 this.currentPage = slide;
                 this.numPage.innerHTML = this.index + 1;
 
-                this.slides.forEach(function (elem) {
-                    elem.classList.remove('active');
-                })
+                for (let i = 0; i < this.slides.length; i++) {
+                    let slide = this.slides[i];
+                    slide.classList.remove('active');
+                }
 
                 slide.classList.add('active');
 
@@ -134,188 +166,248 @@
             }
         }
 
-        const hasPositionChanged = ({ pos, prevPos }) => pos !== prevPos;
-
-        const valueInRange = ({ minScale, maxScale, scale }) => scale <= maxScale && scale >= minScale;
-
-        const getTranslate = ({ minScale, maxScale, scale }) => ({ pos, prevPos, translate }) =>
-            valueInRange({ minScale, maxScale, scale }) && hasPositionChanged({ pos, prevPos })
-                ? translate + (pos - prevPos * scale) * (1 - 1 / scale)
-                : translate;
-
-        const getMatrix = ({ scale, translateX, translateY }) => `matrix(${scale}, 0, 0, ${scale}, ${translateX}, ${translateY})`;
-
-        const getScale = ({ scale, minScale, maxScale, scaleSensitivity, deltaScale }) => {
-            let newScale = scale + (deltaScale / (scaleSensitivity / scale));
-            newScale = Math.max(minScale, Math.min(newScale, maxScale));
-            return [scale, newScale];
-        };
-
-        const pan = ({ state, originX, originY }) => {
-
-            const imgDimension = state.element.querySelector('img').getBoundingClientRect();
-            const viewportDimension = state.viewport.getBoundingClientRect();
-            const isImgWider = imgDimension.width >= viewportDimension.width;
-            const isImgHigher = imgDimension.height >= viewportDimension.height;
-
-            if ( (imgDimension.right >= viewportDimension.right && originX < 0)
-                || ((imgDimension.left + originX >= viewportDimension.left)
-                && (originX < 0))
-            ) {
-                state.transformation.translateX += originX;
-            } else if ( (imgDimension.left <= viewportDimension.left && originX > 0)
-                || ((imgDimension.right + originX <= viewportDimension.right)
-                && (originX > 0))
-            ) {
-                state.transformation.translateX += originX;
+        class zoomPanRenderer {
+            constructor({ minScale, maxScale, element, scaleSensitivity = 10 }) {
+                this.element = element;
+                this.viewport = viewport;
+                this.minScale = minScale;
+                this.maxScale = maxScale;
+                this.scaleSensitivity = scaleSensitivity;
+                this.transformation = {
+                    originX: 0,
+                    originY: 0,
+                    prevX: 0,
+                    prevY: 0,
+                    translateX: 0,
+                    translateY: 0,
+                    scale: 1
+                };
+                this._triggers = {};
+                this.isIE11 = !!window.MSInputMethodContext && !!document.documentMode;
+                this.isTouch = ('ontouchstart' in window);
             }
 
-            if ( (imgDimension.top + originY <= viewportDimension.top)
-                && (originY > 0)
-            ) {
-                state.transformation.translateY += originY;
-            } else if ( (imgDimension.bottom + originY >= viewportDimension.bottom)
-                && (originY < 0)
-            ) {
-                state.transformation.translateY += originY;
+            hasPositionChanged({ pos, prevPos }) {
+                return pos !== prevPos;
             }
 
-            if (!isImgWider) {
-                state.transformation.translateX = 0;
+            valueInRange({ minScale, maxScale, scale }) {
+                return scale <= maxScale && scale >= minScale;
             }
 
-            if (!isImgHigher) {
-                state.transformation.translateY = 0;
+            getTranslate({ minScale, maxScale, scale }) {
+                return ({ pos, prevPos, translate }) =>
+                    this.valueInRange({ minScale, maxScale, scale }) && this.hasPositionChanged({ pos, prevPos })
+                        ? translate + (pos - prevPos * scale) * (1 - 1 / scale)
+                        : translate;
             }
 
-            state.element.style.transform = getMatrix({
-                scale: state.transformation.scale,
-                translateX: state.transformation.translateX,
-                translateY: state.transformation.translateY
-            });
+            getMatrix({ scale, translateX, translateY }) {
+                return `matrix(${scale}, 0, 0, ${scale}, ${translateX}, ${translateY})`;
+            }
 
-            state.triggerHandler('pan');
-        };
+            getScale({ scale, minScale, maxScale, scaleSensitivity, deltaScale }) {
+                let newScale = scale + (deltaScale / (scaleSensitivity / scale));
+                newScale = Math.max(minScale, Math.min(newScale, maxScale));
+                return [scale, newScale];
+            }
 
-        const canSetElement = (state) => ({
-            setElement: (element) => {state.element = element}
-        });
 
-        const canSetEventListener = (state) => ({
-            on: (event,callback) => {
-                if(!state._triggers[event])
-                    state._triggers[event] = [];
-                state._triggers[event].push( callback );
-            },
-        });
+            setElement( element ) {
+                this.element = element
+            }
 
-        const canGetState = (state) => ({
-            getState: () => state,
-        });
+            on( event, callback ) {
+                if(!this._triggers[event])
+                    this._triggers[event] = [];
+                this._triggers[event].push( callback );
+            }
 
-        const canPan = (state) => ({
-            panBy: ({ originX, originY }) => pan({ state, originX, originY }),
-            panTo: ({ originX, originY, scale }) => {
-                state.transformation.scale = scale;
-                pan({ state, originX: originX - state.transformation.translateX, originY: originY - state.transformation.translateY });
-            },
-        });
+            resetPrev() {
+                this.transformation.prevX = 0;
+                this.transformation.prevY = 0;
+            }
 
-        const canZoom = (state) => ({
-            zoom: ({ x, y, deltaScale }) => {
-                const { left, top } = state.element.getBoundingClientRect();
-                const { minScale, maxScale, scaleSensitivity } = state;
-                const [scale, newScale] = getScale({ scale: state.transformation.scale, deltaScale, minScale, maxScale, scaleSensitivity });
+            pan({ originX, originY }) {
+                const imgDimension = this.element.querySelector('img').getBoundingClientRect();
+                const viewportDimension = this.viewport.getBoundingClientRect();
+                const isImgWider = imgDimension.width >= viewportDimension.width;
+                const isImgHigher = imgDimension.height >= viewportDimension.height;
+
+                if ( (imgDimension.right >= viewportDimension.right && originX < 0)
+                    || ((imgDimension.left + originX >= viewportDimension.left)
+                        && (originX < 0))
+                ) {
+                    this.transformation.translateX += originX;
+                } else if ( (imgDimension.left <= viewportDimension.left && originX > 0)
+                    || ((imgDimension.right + originX <= viewportDimension.right)
+                        && (originX > 0))
+                ) {
+                    this.transformation.translateX += originX;
+                } else if (this.isIE11) {
+                    this.transformation.translateX += originX;
+                }
+
+                if ( (imgDimension.top + originY <= viewportDimension.top)
+                    && (originY > 0)
+                ) {
+                    this.transformation.translateY += originY;
+                } else if ( (imgDimension.bottom + originY >= viewportDimension.bottom)
+                    && (originY < 0)
+                ) {
+                    this.transformation.translateY += originY;
+                } else if (this.isIE11) {
+                    this.transformation.translateY += originY;
+                }
+
+                if (!isImgWider) {
+                    this.transformation.translateX = 0;
+                }
+
+                if (!isImgHigher) {
+                    this.transformation.translateY = 0;
+                }
+
+                this.element.style.transform = this.getMatrix({
+                    scale: this.transformation.scale,
+                    translateX: this.transformation.translateX,
+                    translateY: this.transformation.translateY
+                });
+
+                this.triggerHandler('pan');
+            }
+
+            panBy({ originX, originY }) {
+                if (this.isIE11 || this.isTouch) {
+                    const movementX = (this.transformation.prevX ? originX - this.transformation.prevX : 0);
+                    const movementY = (this.transformation.prevY ? originY - this.transformation.prevY : 0);
+                    this.transformation.prevX = originX;
+                    this.transformation.prevY = originY;
+
+                    this.pan({ originX: movementX, originY: movementY });
+                } else {
+                    this.pan({ originX, originY });
+                }
+            }
+
+            panTo({ originX, originY, scale }) {
+                if (this.isIE11 || this.isTouch) {
+                    const movementX = (this.transformation.prevX ? originX - this.transformation.prevX : 0);
+                    const movementY = (this.transformation.prevY ? originY - this.transformation.prevY : 0);
+                    this.transformation.prevX = originX;
+                    this.transformation.prevY = originY;
+
+                    this.transformation.scale = scale;
+                    this.pan({ originX: movementX, originY: movementY });
+                } else {
+                    this.transformation.scale = scale;
+                    this.pan({ originX, originY });
+                }
+            }
+
+            zoom({ x, y, deltaScale }) {
+                const { left, top } = this.element.getBoundingClientRect();
+                const { minScale, maxScale, scaleSensitivity } = this;
+                const [scale, newScale] = this.getScale({ scale: this.transformation.scale, deltaScale, minScale, maxScale, scaleSensitivity });
                 const originX = x - left;
                 const originY = y - top;
                 const newOriginX = originX / scale;
                 const newOriginY = originY / scale;
-                const translate = getTranslate({ scale, minScale, maxScale });
-                const translateX = translate({ pos: originX, prevPos: state.transformation.originX, translate: state.transformation.translateX });
-                const translateY = translate({ pos: originY, prevPos: state.transformation.originY, translate: state.transformation.translateY });
+                const translate = this.getTranslate({ scale, minScale, maxScale });
+                const translateX = translate({ pos: originX, prevPos: this.transformation.originX, translate: this.transformation.translateX });
+                const translateY = translate({ pos: originY, prevPos: this.transformation.originY, translate: this.transformation.translateY });
 
-                state.element.style.transformOrigin = `${newOriginX}px ${newOriginY}px`;
-                state.element.style.transform = getMatrix({ scale: newScale, translateX, translateY });
-                state.transformation = { originX: newOriginX, originY: newOriginY, translateX, translateY, scale: newScale };
+                this.element.style.transformOrigin = `${newOriginX}px ${newOriginY}px`;
 
-                state.triggerHandler('zoom', state);
-            },
-            scale: (scale) => {
-                state.transformation.scale = scale;
-                pan({ state, originX: 0, originY: 0 });
+                this.element.style.transform = this.getMatrix({
+                    scale: newScale,
+                    translateX,
+                    translateY
+                });
+
+                this.transformation = { originX: newOriginX, originY: newOriginY, translateX, translateY, scale: newScale };
+
+                this.triggerHandler('zoom', this.transformation.scale);
             }
-        });
 
-        const renderer = ({ minScale, maxScale, element, scaleSensitivity = 10 }) => {
-            const state = {
-                element,
-                viewport,
-                minScale,
-                maxScale,
-                scaleSensitivity,
-                transformation: {
-                    originX: 0,
-                    originY: 0,
-                    translateX: 0,
-                    translateY: 0,
-                    scale: 1
-                },
-                _triggers: {},
-                triggerHandler: (event,params) => {
-                    if( state._triggers[event] ) {
-                        for(let i in state._triggers[event] )
-                            state._triggers[event][i](params);
-                    }
-                },
-            };
-            return Object.assign(
-                {},
-                canZoom(state),
-                canPan(state),
-                canSetElement(state),
-                canSetEventListener(state),
-                canGetState(state)
-            );
-        };
+            scale(scale) {
+                this.transformation.scale = scale;
+                this.pan({ originX: 0, originY: 0 });
+                this.triggerHandler('scale', this.transformation.scale);
+            }
+
+            triggerHandler(event,params) {
+                if (this._triggers[event])
+                    for (let i in this._triggers[event])
+                        this._triggers[event][i](params);
+            }
+        }
 
         let isMouseDown = false;
-        const container = document.querySelector(".b-pdf-carousel");
         const viewport = document.querySelector(".b-pdf-carousel-viewport");
-        const instance = renderer({
+        const instance = new zoomPanRenderer({
             scaleSensitivity: 10,
             minScale: 1,
             maxScale: 5,
-            element: container.querySelector('.b-pdf-carousel-slide'),
+            element: viewport.querySelector('.b-pdf-carousel-slide'),
             viewport: viewport
         });
-        viewport.addEventListener("wheel", (event) => {
+
+        const onWheel = (event) => {
             event.preventDefault();
             instance.zoom({
                 deltaScale: Math.sign(event.deltaY) > 0 ? -1 : 1,
                 x: event.pageX,
                 y: event.pageY
             });
-        });
-        document.addEventListener('mousedown', (event) => {
-            if (event.which === 1) {
+        }
+        const onMouseDown = (event) => {
+            if (event.which === 1 || ("ontouchstart" in window)) {
                 isMouseDown = true;
             }
             viewport.classList.add('grab');
-        });
-        document.addEventListener('mouseup', (event) => {
+        };
+        const onMouseEnd = (event) => {
             isMouseDown = false;
             viewport.classList.remove('grab');
-        });
-        container.addEventListener("mousemove", (event) => {
+            instance.resetPrev();
+        };
+        const onMouseMove = (event) => {
             if (!isMouseDown) {
                 return;
             }
             event.preventDefault();
-            instance.panBy({
-                originX: event.movementX,
-                originY: event.movementY
-            });
-        })
+            // if is IE11
+            if(!!window.MSInputMethodContext && !!document.documentMode) {
+                instance.panBy({
+                    originX: event.screenX,
+                    originY: event.screenY
+                });
+            // if is touch device
+            } else if ("ontouchstart" in window) {
+                const touchObj = event.changedTouches[0];
+                instance.panBy({
+                    originX: touchObj.screenX,
+                    originY: touchObj.screenY
+                });
+            } else {
+                instance.panBy({
+                    originX: event.movementX,
+                    originY: event.movementY
+                });
+            }
+        };
+
+        viewport.addEventListener("wheel", onWheel);
+        if ("ontouchstart" in window) {
+            document.addEventListener('touchstart', onMouseDown);
+            document.addEventListener('touchend', onMouseEnd);
+            viewport.addEventListener("touchmove", onMouseMove);
+        } else {
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mouseup', onMouseEnd);
+            viewport.addEventListener("mousemove", onMouseMove);
+        }
 
         const reader = new zoomReader({
             container: '.b-pdf-carousel-main',
@@ -326,6 +418,8 @@
             numPage: '#page_num',
             pageCount: '#page_count',
             scaleTrack: '.b-pdf-carousel-scale-track',
+            plus: '.b-pdf-carousel-scale-track-plus',
+            minus: '.b-pdf-carousel-scale-track-minus',
             renderer: instance,
         });
     });

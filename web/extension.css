@@ -17,8 +17,7 @@
     border: none;
     flex: 1 1 auto;
     cursor: pointer;
-    /*background-color: rgba(0,0,0,.05);*/
-    background-color: #f9f9f988;
+    background-color: #f5f5f588;
     outline: none;
     transition: background-color .3s;
     position: absolute;
@@ -28,7 +27,7 @@
 }
 .b-pdf-carousel-prev:hover,
 .b-pdf-carousel-next:hover {
-    background-color: #f9f9f9aa;
+    background-color: #f5f5f5aa;
 }
 .b-pdf-carousel.load .b-pdf-carousel-prev,
 .b-pdf-carousel.load .b-pdf-carousel-next {
@@ -42,7 +41,6 @@
     background-position: center;
     background-size: 27px;
     background-repeat: no-repeat;
-    /*background-color: transparent;*/
     right: 0;
 }
 .b-pdf-carousel.load .b-pdf-carousel-prev {
@@ -50,7 +48,6 @@
     background-position: center;
     background-size: 27px;
     background-repeat: no-repeat;
-    /*background-color: transparent;*/
     left: 0;
 }
 .b-pdf-carousel.load .b-pdf-carousel-prev:hover,
@@ -65,7 +62,7 @@
 }
 .b-pdf-carousel.load .b-pdf-carousel-prev:focus,
 .b-pdf-carousel.load .b-pdf-carousel-next:focus {
-    background-color: #f9f9f988;
+    background-color: #f5f5f588;
 }
 
 /* footer */
@@ -75,13 +72,15 @@
 .b-pdf-carousel-footer {
     display: none;
     justify-content: space-between;
-    padding: 16px 64px 48px;
+    padding: 16px 32px 48px;
     width: 100%;
     background-color: transparent;
 }
 .b-pdf-carousel-footer .b-pdf-carousel-pagenums {
-
+    white-space: nowrap;
+    font-size: 16px;
 }
+
 
 /* viewport */
 .b-pdf-carousel-viewport {
@@ -115,18 +114,40 @@
 }
 
 /* slider zoom */
-.b-pdf-carousel-scale-track {
+.b-pdf-carousel-scale-track-wrapper {
+    display: flex;
     min-width: 200px;
     width: calc(100% - 200px);
     margin-top: 6px;
 }
-/*.b-pdf-carousel-scale-track.noUi-horizontal {*/
-/*    height: 6px;*/
-/*}*/
-/*.b-pdf-carousel-scale-track.noUi-horizontal .noUi-handle {*/
-/*    height: 20px;*/
-/*}*/
-/*.b-pdf-carousel-scale-track .noUi-handle:after,*/
-/*.b-pdf-carousel-scale-track .noUi-handle:before {*/
-/*    height: 8px;*/
-/*}*/
+.b-pdf-carousel-scale-track {
+    flex: 1 1 auto;
+    margin: 0 20px 0 20px;
+}
+.b-pdf-carousel-scale-track-minus,
+.b-pdf-carousel-scale-track-plus {
+    cursor: pointer;
+    margin-top: -4px;
+    user-select: none;
+    width: 27px;
+    height: 27px;
+    text-align: center;
+    font-size: 16px;
+}
+
+@media (max-width: 768px) {
+    .b-pdf-carousel {
+        margin: 0 -20px;
+    }
+    .b-pdf-carousel-main {
+        width: calc(100% + 40px);
+        max-width: calc(100% + 40px);
+    }
+    .b-pdf-carousel.load .b-pdf-carousel-prev,
+    .b-pdf-carousel.load .b-pdf-carousel-next {
+        width: 50px;
+    }
+    .b-pdf-carousel-footer {
+        padding: 16px 16px 48px;
+    }
+}
